@@ -15,9 +15,18 @@ const serviceAccountPath = path.join(
 let firebaseReady = false;
 if (!admin.apps.length) {
   try {
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccountPath),
-    });
+    let credential;
+
+    if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+      // Production: load from environment variable (JSON string)
+      const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+      credential = admin.credential.cert(serviceAccount);
+    } else {
+      // Local dev: load from file
+      credential = admin.credential.cert(serviceAccountPath);
+    }
+
+    admin.initializeApp({ credential });
     firebaseReady = true;
   } catch (err) {
     console.warn(
