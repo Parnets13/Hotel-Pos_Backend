@@ -48,7 +48,7 @@ app.options('*', cors());
 //           "data:",
 //           "http://localhost:3000",
 //           "http://localhost:5173",
-//           "https://billing.jagalikoota.com",
+//           "https://hotel-pos-backend-rfa4.onrender.com",
 //           "https://hotelvirat.s3.amazonaws.com"
 //         ],
 //       },
@@ -82,35 +82,61 @@ createDirIfNotExists("uploads/gallery");
 // Serve static files from the "uploads" directory
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 // MongoDB Connection with better error handling and reconnection
-const mongoURI = process.env.MONGO_URI || 'mongodb+srv://hotelvirat:zR4WlMNuRO3ZB60x@cluster0.vyfwyjl.mongodb.net/HotelVirat';
+// Database connection — read from .env. MONGODBURL is this project's variable
+// (MONGO_URI / MONGODB_URI also accepted). There is deliberately NO silent
+// fallback, so data can never accidentally land on an old/wrong database; if
+// the connection string is missing the server refuses to start.
+const mongoURI =
+  process.env.MONGO_URI ||
+  process.env.MONGODBURL ||
+  process.env.MONGODB_URI;
+if (!mongoURI) {
+  console.error("❌ No MongoDB connection string found. Set MONGODBURL (or MONGO_URI) in .env.");
+  process.exit(1);
+}
 
-mongoose
-  .connect(mongoURI, {
-    serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
-    socketTimeoutMS: 45000, // Close sockets after 45s of inactivity
-  })
-  .then(() => {
-    console.log("✅ MongoDB Connected Successfully");
-    console.log("📊 Database:", mongoose.connection.name);
-    // Start crons after DB is ready
-    const {
-      startMonthlyServiceChargeCron,
-      startBirthdayCron,
-      startExpiryReminderCron,
-      startAnniversaryCron,
-      startMonthlyStatementCron,
-    } = require("./services/monthlyServiceChargeCron");
-    startMonthlyServiceChargeCron();
-    startBirthdayCron();
-    startExpiryReminderCron();
-    startAnniversaryCron();
-    startMonthlyStatementCron();
-  })
-  .catch((err) => {
-    console.error("❌ MongoDB Connection Error: ", err.message);
-    console.error("⚠️  Server will continue, but database operations will fail");
-    console.error("⚠️  Please check your MONGO_URI in .env file");
-  });
+// MongoDB Connection with automatic retry on failure.
+// If the initial connection fails (transient Atlas/network slowness), retry
+// every 5s instead of leaving the server running with no DB — a no-DB server
+// still answers requests, but every query buffers and times out
+// ("findOne() buffering timed out"). Crons start exactly once, on first
+// successful connect.
+let cronsStarted = false;
+function startCrons() {
+  if (cronsStarted) return;
+  cronsStarted = true;
+  const {
+    startMonthlyServiceChargeCron,
+    startBirthdayCron,
+    startExpiryReminderCron,
+    startAnniversaryCron,
+    startMonthlyStatementCron,
+  } = require("./services/monthlyServiceChargeCron");
+  startMonthlyServiceChargeCron();
+  startBirthdayCron();
+  startExpiryReminderCron();
+  startAnniversaryCron();
+  startMonthlyStatementCron();
+}
+
+function connectWithRetry(attempt = 1) {
+  mongoose
+    .connect(mongoURI, {
+      serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
+      socketTimeoutMS: 45000, // Close sockets after 45s of inactivity
+    })
+    .then(() => {
+      console.log("✅ MongoDB Connected Successfully");
+      console.log("📊 Database:", mongoose.connection.name);
+      startCrons();
+    })
+    .catch((err) => {
+      console.error(`❌ MongoDB connection attempt ${attempt} failed:`, err.message);
+      console.error("⚠️  Retrying in 5 seconds...");
+      setTimeout(() => connectWithRetry(attempt + 1), 5000);
+    });
+}
+connectWithRetry();
 // MongoDB connection event handlers
 mongoose.connection.on('connected', () => {
   console.log('🔗 MongoDB connection established');
@@ -146,7 +172,7 @@ const staffLoginRoutes = require("./routes/staffLoginRoutes");
 const tableRoutes = require("./routes/tableRoutes");
 // const peopleSelectionRoutes = require("./routes/peopleSelectionRoutes");
 const staffOrderRoutes = require("./routes/staffOrderRoutes");
-// const mobileStaffOrderRoutes = require("./routes/mobileStaffOrderRoutes");
+const mobileStaffOrderRoutes = require("./routes/mobileStaffOrderRoutes");
 const counterOrderRoutes = require("./routes/counterOrderRoutes");
 const billingSessionRoutes = require("./routes/billingSessionRoutes");
 const counterBillRoutes = require("./routes/counterBillRoutes");
@@ -162,7 +188,7 @@ const reservationRoutes = require("./routes/reservationRoutes");
 // const goodsReceiptNoteRoutes = require("./routes/goodReceipNotesRoutes");
 // const expenseRoutes = require("./routes/expenseRoutes");
 const purchaseUserRoutes = require("./routes/purchaseUserRoutes");
-// const productSubmissionRoutes = require("./routes/productSubmissionRoutes");
+const productSubmissionRoutes = require("./routes/productSubmissionRoutes");
 // const stockRoutes = require("./routes/stockInwardRoutes");
 // const storeLocationRoutes = require("./routes/storeLocationRoutes");
 // const inventoryRoutes = require("./routes/inventoryRoutes");
@@ -180,7 +206,7 @@ const categoryAccessRoutes = require("./routes/categoryAccessRoutes");
 const billResetRoutes = require("./routes/billResetRoutes");
 
 // Website Routes — commented out (not in use)
-// const websiteRoutes = require("./routes/websiteRoutes");
+const websiteRoutes = require("./routes/websiteRoutes");
 
 // Restaurant Profile Adapter Routes
 const restaurantProfileRoutes = require("./routes/restaurantProfileRoutes");
@@ -220,7 +246,7 @@ app.use("/api/v1/hotel/staff-auth", staffLoginRoutes);
 app.use("/api/v1/hotel/table", tableRoutes);
 // app.use("/api/v1/hotel/people-selection", peopleSelectionRoutes);
 app.use("/api/v1/hotel/staff-order", staffOrderRoutes);
-// app.use("/api/v1/hotel/mobile-staff-order", mobileStaffOrderRoutes);
+app.use("/api/v1/hotel/mobile-staff-order", mobileStaffOrderRoutes);
 app.use("/api/v1/hotel/counter-order", counterOrderRoutes);
 app.use("/api/v1/hotel/billing-session", billingSessionRoutes);
 app.use("/api/v1/hotel/servers", serverRoutes);
@@ -236,7 +262,7 @@ app.use("/api/v1/hotel/counter-bill", counterBillRoutes);
 app.use("/api/v1/hotel/reservation", reservationRoutes);
 // app.use("/api/v1/hotel/expense", expenseRoutes);
 app.use("/api/v1/hotel/purchase-user-auth", purchaseUserRoutes);
-// app.use("/api/v1/hotel/product-submission", productSubmissionRoutes);
+app.use("/api/v1/hotel/product-submission", productSubmissionRoutes);
 // app.use("/api/v1/hotel/stock", stockRoutes);
 // app.use("/api/v1/hotel/store-location", storeLocationRoutes);
 // app.use("/api/v1/hotel/inventory", inventoryRoutes);
@@ -270,8 +296,8 @@ app.use("/api/v1/hotel/affiliated-members", require("./membership/routes/affilia
 // Bill Reset Routes
 app.use("/api/v1/hotel/bill-reset", billResetRoutes);
 
-// Website Routes — not in use
-// app.use("/api/website", websiteRoutes);
+// Website Routes
+app.use("/api/website", websiteRoutes);
 
 // Serve React Frontend Build (add your build folder here)
 // This must come AFTER all API routes

@@ -3,14 +3,9 @@ const HelpSupport = require("../model/helpSupportModel")
 // Get help and support information
 exports.getHelpSupport = async (req, res) => {
   try {
-    // Get the active help and support information
     const helpSupport = await HelpSupport.findOne({ isActive: true }).sort({ createdAt: -1 })
-
-    if (!helpSupport) {
-      return res.status(404).json({ message: "Help and support information not found" })
-    }
-
-    res.status(200).json(helpSupport)
+    // Return null data with 200 when no record exists yet (first-time setup)
+    res.status(200).json(helpSupport || null)
   } catch (error) {
     res.status(500).json({ message: "Error fetching help and support information", error: error.message })
   }

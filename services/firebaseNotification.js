@@ -1,16 +1,33 @@
 const admin = require("firebase-admin");
 const path = require("path");
 
-// Initialize Firebase Admin SDK
+// Initialize Firebase Admin SDK.
+// Initialisation is wrapped so a missing/invalid service account file does
+// NOT crash the server (the file is a deployment secret that may be absent in
+// local/dev checkouts). When init fails, push notifications are disabled
+// gracefully and the rest of the app — including the scheduled cron jobs —
+// continues to run. Add config/firebase-service-account.json to enable FCM.
 const serviceAccountPath = path.join(
   __dirname,
   "../config/firebase-service-account.json"
 );
 
+let firebaseReady = false;
 if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert(serviceAccountPath),
-  });
+  try {
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccountPath),
+    });
+    firebaseReady = true;
+  } catch (err) {
+    console.warn(
+      "[FCM] Firebase Admin could not be initialised — push notifications disabled. Reason:",
+      err.message
+    );
+    firebaseReady = false;
+  }
+} else {
+  firebaseReady = true;
 }
 
 /**
@@ -23,6 +40,11 @@ if (!admin.apps.length) {
 const sendToDevice = async (fcmToken, title, body, data = {}) => {
   if (!fcmToken) {
     console.warn("[FCM] No token provided, skipping notification");
+    return null;
+  }
+
+  if (!firebaseReady) {
+    console.warn("[FCM] Not initialised (service account missing) — skipping notification");
     return null;
   }
 
@@ -130,6 +152,11 @@ const sendToMultiple = async (tokens, title, body, data = {}) => {
 
   const validTokens = tokens.filter(Boolean);
   if (validTokens.length === 0) return [];
+
+  if (!firebaseReady) {
+    console.warn("[FCM] Not initialised (service account missing) — skipping multicast");
+    return null;
+  }
 
   try {
     const message = {

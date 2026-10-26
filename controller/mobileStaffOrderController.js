@@ -317,25 +317,19 @@ const getCategorySalesReport = async (req, res) => {
   try {
     const { branchId, categoryId, startDate, endDate } = req.query
 
-
-    if (!branchId || !categoryId) {
-      return res.status(400).json({
-        success: false,
-        message: "Branch ID and Category ID are required",
-      })
-    }
-
     // Build query for completed orders with bills printed (excluding complimentary)
     const query = {
-      branchId: branchId,
-      categoryId: categoryId,
-      billPrinted: true, // Only show orders where bill has been printed
-      status: { $in: ["completed", "served"] }, // Include both completed and served orders
+      billPrinted: true,
+      status: { $in: ["completed", "served"] },
       $or: [
-        { isComplimentary: { $exists: false } }, // Orders without isComplimentary field
-        { isComplimentary: false } // Orders explicitly marked as not complimentary
+        { isComplimentary: { $exists: false } },
+        { isComplimentary: false }
       ]
     }
+
+    // Only filter by branchId / categoryId when provided
+    if (branchId) query.branchId = branchId
+    if (categoryId) query.categoryId = categoryId
 
     // Add date filter if provided, otherwise default to today
     if (startDate || endDate) {
@@ -684,19 +678,10 @@ const getCategoryOrders = async (req, res) => {
   try {
     const { branchId, categoryId, status, startDate, endDate, page = 1, limit = 50 } = req.query
 
-
-    if (!branchId || !categoryId) {
-      return res.status(400).json({
-        success: false,
-        message: "Branch ID and Category ID are required",
-      })
-    }
-
-    // Build query
-    const query = {
-      branchId: branchId,
-      categoryId: categoryId,
-    }
+    // Build query — branchId and categoryId are optional for master admin
+    const query = {}
+    if (branchId) query.branchId = branchId
+    if (categoryId) query.categoryId = categoryId
 
     // Add status filter if provided
     if (status) {
@@ -768,18 +753,9 @@ const getCategoryCancelledOrders = async (req, res) => {
   try {
     const { branchId, categoryId, startDate, endDate } = req.query
 
-    if (!branchId || !categoryId) {
-      return res.status(400).json({
-        success: false,
-        message: "Branch ID and Category ID are required",
-      })
-    }
-
-    const query = {
-      branchId: branchId,
-      categoryId: categoryId,
-      status: "cancelled"
-    }
+    const query = { status: "cancelled" }
+    if (branchId) query.branchId = branchId
+    if (categoryId) query.categoryId = categoryId
 
     // Add date filter - Default to today
     if (startDate || endDate) {
@@ -822,18 +798,9 @@ const getCategoryComplimentaryOrders = async (req, res) => {
   try {
     const { branchId, categoryId, startDate, endDate } = req.query
 
-    if (!branchId || !categoryId) {
-      return res.status(400).json({
-        success: false,
-        message: "Branch ID and Category ID are required",
-      })
-    }
-
-    const query = {
-      branchId: branchId,
-      categoryId: categoryId,
-      isComplimentary: true
-    }
+    const query = { isComplimentary: true }
+    if (branchId) query.branchId = branchId
+    if (categoryId) query.categoryId = categoryId
 
     // Add date filter - Default to today
     if (startDate || endDate) {

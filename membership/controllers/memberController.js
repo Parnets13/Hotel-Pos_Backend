@@ -269,7 +269,7 @@ const scanMemberQR = asyncHandler(async (req, res) => {
   let memberId;
 
   // Support both formats:
-  // 1. URL format: https://billing.jagalikoota.com/member/<id>
+  // 1. URL format: https://hotel-pos-backend-rfa4.onrender.com/member/<id>
   // 2. Legacy JSON format: {"memberId":"...","memberNumber":"...","name":"..."}
   if (qrData.startsWith("http")) {
     // Extract member ID from URL (last path segment)

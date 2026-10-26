@@ -2,6 +2,10 @@ node_modules
 package-lock.json
 .env
 AWS.js
+# middleware/AWS.js is the app's file-storage layer. It reads AWS credentials
+# from environment variables (no hardcoded secrets) and falls back to local
+# disk storage, so it MUST be tracked — the server crashes on startup without it.
+!middleware/AWS.js
 
 # Zip files
 *.zip

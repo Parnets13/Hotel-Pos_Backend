@@ -4,12 +4,8 @@ const AboutUs = require("../model/aboutUsModel")
 exports.getAboutUs = async (req, res) => {
   try {
     const aboutUs = await AboutUs.findOne({ isActive: true }).sort({ createdAt: -1 })
-
-    if (!aboutUs) {
-      return res.status(404).json({ message: "About us information not found" })
-    }
-
-    res.status(200).json(aboutUs)
+    // Return null data with 200 when no record exists yet (first-time setup)
+    res.status(200).json(aboutUs || null)
   } catch (error) {
     res.status(500).json({ message: "Error fetching about us information", error: error.message })
   }
